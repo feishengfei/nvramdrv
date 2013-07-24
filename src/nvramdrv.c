@@ -1,4 +1,3 @@
-#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -9,6 +8,7 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/concat.h>
 #include <linux/mtd/partitions.h>
+#include <linux/semaphore.h>
 
 #include "nvram.h"
 
@@ -40,7 +40,11 @@ static int nvram_major = 251;
 
 char nvram_debug = 1;
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0)
+static struct semaphore nvram_sem;
+#else 
 static DECLARE_MUTEX(nvram_sem);
+#endif
 
 static block_t fb[1] = {
 	{
@@ -200,10 +204,12 @@ int ra_mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf)
 	return ret;
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0)
+long nvramdrv_ioctl(struct file * file,
+	unsigned int cmd, unsigned long buf)
+#elif LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 ssize_t nvramdrv_ioctl(struct file * file,
 	unsigned int cmd, unsigned long buf)
-#else
 ssize_t nvramdrv_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long buf)
 #endif
@@ -250,7 +256,12 @@ int __init nvramdrv_init(void)
 		printk(KERN_DEBUG "nvramdrv: got dynamic major %d\n", r);
     }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0)
+	 sema_init(&nvram_sem, 1);
+#else
 	init_MUTEX(&nvram_sem);
+#endif
+
 	down(&nvram_sem);
 	init_nvram_block();
 	up(&nvram_sem);
@@ -263,9 +274,10 @@ static int init_nvram_block()
 	unsigned long from;
 	int i, j, len;
 	char *p, *q;
+	int index;
 
 	i = 0;
-	int index = i;	
+	index = i;	
 	RANV_PRINT("--> nvram_init %d\n", i);
 	RANV_CHECK_INDEX(-1);
 

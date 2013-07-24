@@ -1,6 +1,5 @@
 #ifndef _nvram_h_
 #define _nvram_h_
-#include <linux/autoconf.h>
 
 #define NVRAM_MTDNAME "nvram"
 #define NVRAM_DEVNAME "nvram"
