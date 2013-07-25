@@ -21,11 +21,6 @@ MODULE_LICENSE("GPL");
 
 static unsigned long counter = 0;
 
-char const *nvram_get(int index, char *name);
-int nvram_getall(int index, char *buf);
-int nvram_set(int index, char *name, char *value);
-int nvram_commit(int index);
-int nvram_clear(int index);
 
 static int nvram_major = 250;
 
@@ -125,7 +120,7 @@ uint32_t nv_crc32(uint32_t crc, const char *buf, uint32_t len)
 }
 
 /* ========================================================================= */
-int ra_mtd_write_nm(char *name, loff_t to, size_t len, const u_char *buf)
+int mtd_write_nm(char *name, loff_t to, size_t len, const u_char *buf)
 {
 	int ret = -1;
 	size_t rdlen, wrlen;
@@ -154,7 +149,7 @@ int ra_mtd_write_nm(char *name, loff_t to, size_t len, const u_char *buf)
 		return ret;
 	}
 	if (rdlen != mtd->erasesize)
-		printk("warning: ra_mtd_write: rdlen is not equal to erasesize\n");
+		printk("warning: mtd_write: rdlen is not equal to erasesize\n");
 
 	memcpy(bak + to, buf, len);
 
@@ -177,7 +172,7 @@ int ra_mtd_write_nm(char *name, loff_t to, size_t len, const u_char *buf)
 	return ret;
 }
 
-int ra_mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf)
+int mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf)
 {
 	int ret;
 	size_t rdlen;
@@ -189,7 +184,7 @@ int ra_mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf)
 
 	ret = mtd->read(mtd, from, len, &rdlen, buf);
 	if (rdlen != len)
-		printk("warning: ra_mtd_read_nm: rdlen is not equal to len\n");
+		printk("warning: mtd_read_nm: rdlen is not equal to len\n");
 
 	put_mtd_device(mtd);
 	return ret;
@@ -342,7 +337,7 @@ static int init_nvram_block()
 	//read crc from flash
 	from = fb[i].flash_offset;
 	len = sizeof(fb[i].env.crc);
-	ra_mtd_read_nm(NVRAM_MTDNAME, from, len, (unsigned char *)&fb[i].env.crc);
+	mtd_read_nm(NVRAM_MTDNAME, from, len, (unsigned char *)&fb[i].env.crc);
 
 	//read data from flash
 	from = from + len;
@@ -354,7 +349,7 @@ static int init_nvram_block()
 	if (!fb[i].env.data)
 		return -ENOMEM;
 
-	ra_mtd_read_nm(NVRAM_MTDNAME, from, len, (unsigned char *)fb[i].env.data);
+	mtd_read_nm(NVRAM_MTDNAME, from, len, (unsigned char *)fb[i].env.data);
 
 	//check crc
 	if (nv_crc32(0, fb[i].env.data, len) != fb[i].env.crc) {
@@ -498,12 +493,12 @@ int nvram_clear(int index)
         //write crc to flash
 	to = fb[index].flash_offset;
 	len = sizeof(fb[index].env.crc);
-	ra_mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)&fb[index].env.crc);
+	mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)&fb[index].env.crc);
 
 	//write all 1s data to flash
 	to = to + len;
 	len = fb[index].flash_max_len - len;
-	ra_mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)fb[index].env.data);
+	mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)fb[index].env.data);
 
 	RANV_PRINT("clear flash from 0x%x for 0x%x bytes\n", (unsigned int)to, len);
 	fb[index].dirty = 0;
@@ -567,12 +562,12 @@ int nvram_commit(int index)
 	//write crc to flash
 	to = fb[index].flash_offset;
 	len = sizeof(fb[index].env.crc);
-	ra_mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)&fb[index].env.crc);
+	mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)&fb[index].env.crc);
 
 	//write data to flash
 	to = to + len;
 	len = fb[index].flash_max_len - len;
-	ra_mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)fb[index].env.data);
+	mtd_write_nm(NVRAM_MTDNAME, to, len, (unsigned char *)fb[index].env.data);
 
 	fb[index].dirty = 0;
 

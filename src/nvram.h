@@ -59,12 +59,18 @@ typedef struct nvram_ioctl_s {
 #define NVRAM_IOCTL_COMMIT	0x04
 #define NVRAM_IOCTL_CLEAR	0x05
 
-static int ra_mtd_write_nm(char *name, loff_t to, 
+static int mtd_write_nm(char *name, loff_t to, 
 	size_t len, const u_char *buf);
-static int ra_mtd_read_nm(char *name, loff_t from, 
+static int mtd_read_nm(char *name, loff_t from, 
 	size_t len, u_char *buf);
 
 static int init_nvram_block(void);
 static int ra_nvram_close(void);
+
+char const *nvram_get(int index, char *name);
+int nvram_getall(int index, char *buf);
+int nvram_set(int index, char *name, char *value);
+int nvram_commit(int index);
+int nvram_clear(int index);
 
 #endif /* _nvram_h_ */
