@@ -12,7 +12,6 @@
 
 #include "nvram.h"
 
-#define NVRAMDRV_MAJOR	124
 #define ENV_BLK_SIZE 0x1000
 #define FLASH_BLOCK_NUM	1
 
@@ -22,23 +21,15 @@ MODULE_LICENSE("GPL");
 
 static unsigned long counter = 0;
 
-extern int ra_mtd_write_nm(char *name, loff_t to, size_t len, 
-	const u_char *buf);
-extern int ra_mtd_read_nm(char *name, loff_t from, size_t len, 
-	u_char *buf);
-
-static int init_nvram_block(void);
-static int ra_nvram_close(void);
-
 char const *nvram_get(int index, char *name);
 int nvram_getall(int index, char *buf);
 int nvram_set(int index, char *name, char *value);
 int nvram_commit(int index);
 int nvram_clear(int index);
 
-static int nvram_major = 251;
+static int nvram_major = 250;
 
-char nvram_debug = 1;
+char nvram_debug = 0;
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0)
 static struct semaphore nvram_sem;
@@ -210,21 +201,85 @@ long nvramdrv_ioctl(struct file * file,
 #elif LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 ssize_t nvramdrv_ioctl(struct file * file,
 	unsigned int cmd, unsigned long buf)
+#else
 ssize_t nvramdrv_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long buf)
 #endif
 {
-    int temp = 0;
-    return temp;
+	int index, len;
+	const char *p;
+	nvram_ioctl_t *nvr;
+	char *value;
+
+
+	switch (cmd) {
+		case NVRAM_IOCTL_GET:
+			nvr = (nvram_ioctl_t __user *)buf;
+			p = nvram_get(nvr->index, nvr->name);
+			if (p == NULL)
+				p = "";
+
+			if (copy_to_user(nvr->value, p, strlen(p) + 1))
+				return -EFAULT;
+			break;
+
+		case NVRAM_IOCTL_GETALL:
+			nvr = (nvram_ioctl_t __user *)buf;
+			//index = nvr->index;
+			index = 0;
+			len = fb[index].flash_max_len - sizeof(fb[index].env.crc);
+
+			if (nvram_getall(index, fb[index].env.data) == 0) {
+				if (copy_to_user(nvr->value, fb[index].env.data, len))
+					return -EFAULT;
+			}
+			break;
+		case NVRAM_IOCTL_SET:
+			nvr = (nvram_ioctl_t *)buf;		
+			value = (char *)kmalloc(MAX_VALUE_LEN, GFP_KERNEL);
+			if (!value)
+				return -ENOMEM;
+
+			if (copy_from_user(value, nvr->value, strlen(nvr->value) + 1)) {
+				kfree(value);
+				return -EFAULT;
+			}
+
+			nvram_set(nvr->index, nvr->name, value);
+			kfree(value);
+			break;
+
+		case NVRAM_IOCTL_COMMIT:
+			nvr = (nvram_ioctl_t __user *)buf;
+			nvram_commit(nvr->index);
+			break;
+		case NVRAM_IOCTL_CLEAR:
+			nvr = (nvram_ioctl_t __user *)buf;
+			nvram_clear(nvr->index);
+		default:
+			printk(KERN_CRIT "Unsupported ioctl(%d) on nvram\n", cmd);
+			break;
+	}
+	return 0;
 }
 
 int nvramdrv_open(struct inode *inode, struct file *filp)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	MOD_INC_USE_COUNT;
+#else
+	try_module_get(THIS_MODULE);
+#endif
     return 0;
 }
 
 int nvramdrv_release(struct inode *inode, struct file *filp)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	MOD_DEC_USE_COUNT;
+#else
+	module_put(THIS_MODULE);
+#endif
     return 0;
 }
 
