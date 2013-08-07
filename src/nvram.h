@@ -66,6 +66,8 @@ static int mtd_read_nm(char *name, loff_t from,
 
 static int init_nvram_block(void);
 static int ra_nvram_close(void);
+static int cache_idx(int index, char *name);
+
 
 char const *nvram_get(int index, char *name);
 int nvram_getall(int index, char *buf);
